@@ -79,23 +79,6 @@ namespace BackgroundSocketSample
             }
         }
 
-        protected override void OnActivated(IActivatedEventArgs args)
-        {
-            base.OnActivated(args);
-
-            if(args.Kind == ActivationKind.Protocol)
-            {
-                var _arg = args as ProtocolActivatedEventArgs;
-                Frame rootFrame = Window.Current.Content as Frame;
-                rootFrame = new Frame();
-
-                // フレームを現在のウィンドウに配置します
-                Window.Current.Content = rootFrame;
-                rootFrame.Navigate(typeof(MainPage), "hoge");
-                Window.Current.Activate();
-            }
-        }
-
         /// <summary>
         /// 特定のページへの移動が失敗したときに呼び出されます
         /// </summary>

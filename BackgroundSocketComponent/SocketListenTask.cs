@@ -24,75 +24,75 @@ namespace BackgroundSocketComponent
             {
                 try
                 {
+                    //ソケットIDを取得
+                    var socketId = ApplicationData.Current.LocalSettings.Values["SocketId"].ToString();
+
                     var details = taskInstance.TriggerDetails as SocketActivityTriggerDetails;
                     var socketInformation = details.SocketInformation;
                     
-                    ShowToast(socketInformation.SocketKind.ToString()+" "+details.Reason.ToString());
-
                     switch (details.Reason)
                     {
+                        //コネクションがアクセプトされたなら(自動でアクセプトされる)
                         case SocketActivityTriggerReason.ConnectionAccepted:
-
+                            //SocketInformationにはStreamSocketに値がある場合とStreamSocketListenerの2パターンがあるのでSocketKindで判別
                             if (socketInformation.SocketKind == SocketActivityKind.StreamSocketListener)
                             {
+                                //StreamSocketListenerを取得
                                 var socket = socketInformation.StreamSocketListener;
+                                //AcceptされたSocketがこのイベントで取得できるがこのイベントが発火するまでプロセスを落としてはいけないので
+                                //Task.Delayで2秒ぐらい待つ
                                 socket.ConnectionReceived += (s, e) =>
                                 {
-                                    //ShowToast("Connected Socket");
+                                    //アクセプトされたソケットを取得したらソケットリスナー登録時同様、このタスクにソケットを受信できるように設定
                                     var socketClient = e.Socket;
                                     socketClient.EnableTransferOwnership(taskInstance.Task.TaskId);
-                                    socketClient.TransferOwnership(socketInformation.Id);
+                                    socketClient.TransferOwnership(socketId);
 
+                                    ShowToast(string.Format("Connect {0}", socketClient.Information.LocalAddress.DisplayName));
+                                    //ソケットリスナーは破棄しないと次回リスナー起動時に死ぬ
                                     socketInformation.StreamSocketListener.Dispose();
                                 };
                                 await Task.Delay(2000);
                                 
                             }
-                            
 
                             break;
                         case SocketActivityTriggerReason.KeepAliveTimerExpired:
-                            socketInformation.StreamSocket.TransferOwnership(socketInformation.Id);
+                            socketInformation.StreamSocket.TransferOwnership(socketId);
                             break;
-
+                        
+                        //ソケットにデータが来た時
                         case SocketActivityTriggerReason.SocketActivity:
+                            //1バイト読んでトーストで表示
                             using (var reader = new DataReader(socketInformation.StreamSocket.InputStream))
                             {
                                 uint readNum = 1;
                                 await reader.LoadAsync(readNum);
                                 var data = reader.ReadString(readNum);
-                                var result = await Launcher.LaunchUriAsync(new Uri("myhoge://"));
-                                ShowToast(result.ToString());
+                                ShowToast(string.Format("DataReceived {0}",data.ToString()));
                             }
-                            socketInformation.StreamSocket.TransferOwnership(socketInformation.Id);
+                            socketInformation.StreamSocket.TransferOwnership(socketId);
                             break;
+                        //ソケットが閉じられたとき
                         case SocketActivityTriggerReason.SocketClosed:
-                            //socketInformation.StreamSocket.TransferOwnership(socketInformation.Id);
-                            var allSockets = SocketActivityInformation.AllSockets;
-                            ShowToast(string.Join(" ",allSockets));
-                            foreach(var socket in allSockets)
+                            //ソケットが閉じられたとき、以下の処理を読んで再度リッスンすればよいが
+                            //OSが再起動したとき、SocketClosedが2回呼ばれる(謎)
+                            //2回の呼び出しの違いはSocketの数なのでSocketの数で1回目を判定して再度リッスン
+                            if (SocketActivityInformation.AllSockets.Count == 0)
                             {
-                                if (socket.Value.SocketKind == SocketActivityKind.StreamSocket)
-                                {
-                                    socket.Value.StreamSocket.Dispose();
-                                }else
-                                {
-                                    socket.Value.StreamSocketListener.Dispose();
-                                }
+                                var socketListener = new StreamSocketListener();
+                                var hostname = NetworkInformation.GetHostNames().Where(q => q.Type == HostNameType.Ipv4).First();
+                                var port = ApplicationData.Current.LocalSettings.Values["SocketPort"].ToString();
+
+                                socketListener.EnableTransferOwnership(taskInstance.Task.TaskId, SocketActivityConnectedStandbyAction.DoNotWake);
+
+                                await socketListener.BindEndpointAsync(hostname, port);
+
+                                await socketListener.CancelIOAsync();
+
+                                socketListener.TransferOwnership(socketId);
+                                ShowToast(string.Format("{0}:{1} restart socket listen",hostname,port));
                             }
-
-                            var socketListener = new StreamSocketListener();
-                            var hostname = NetworkInformation.GetHostNames().Where(q => q.Type == HostNameType.Ipv4).First();
-                            var port = "9001";
-
-                            socketListener.EnableTransferOwnership(taskInstance.Task.TaskId, SocketActivityConnectedStandbyAction.DoNotWake);
-
-                            await socketListener.BindEndpointAsync(hostname, port);
-
-                            await socketListener.CancelIOAsync();
-
-                            socketListener.TransferOwnership(socketInformation.Id);
-                            
                             break;
                         
                     }
@@ -108,6 +108,7 @@ namespace BackgroundSocketComponent
             deferral.Complete();
         }
 
+        //デバッグ表示用
         private void ShowToast(string message)
         {
             //トーストテンプレートの取得

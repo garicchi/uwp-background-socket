@@ -8,8 +8,13 @@
     mc:Ignorable="d">
 
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
-        <Button x:Name="buttonRegister" Content="タスク登録" HorizontalAlignment="Left" Margin="284,295,0,0" VerticalAlignment="Top" Click="buttonRegister_Click"/>
-        <WebView x:Name="webView" HorizontalAlignment="Left" Height="254" Margin="112,36,0,0" VerticalAlignment="Top" Width="437"/>
-
+        <StackPanel>
+            <TextBlock Text="IP Address"></TextBlock>
+            <TextBox Name="textIp" Text="" IsReadOnly="True"/>
+            <TextBlock Text="Port"></TextBlock>
+            <TextBox Name="textPort" Text="" IsReadOnly="True"/>
+            <Button x:Name="buttonRegister" Content="Register Background Task" HorizontalAlignment="Left" VerticalAlignment="Top" Click="buttonRegister_Click"/>
+            <Button x:Name="buttonUnRegister" Content="UnRegister Background Task" HorizontalAlignment="Left" VerticalAlignment="Top" Click="buttonUnRegister_Click"/>
+        </StackPanel>
     </Grid>
 </Page>

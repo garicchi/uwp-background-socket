@@ -10,6 +10,7 @@ using Windows.Foundation.Collections;
 using Windows.Networking;
 using Windows.Networking.Connectivity;
 using Windows.Networking.Sockets;
+using Windows.Storage;
 using Windows.Storage.Streams;
 using Windows.UI.Popups;
 using Windows.UI.Xaml;
@@ -29,63 +30,60 @@ namespace BackgroundSocketSample
     /// </summary>
     public sealed partial class MainPage : Page
     {
-        StreamSocketListener socketListener = null;
-        string socketId = "MySocket";
+        string socketId = "MySocket";   //SocketのID、バックグラウンドタスク側と統一しておく必要がある
+        string initPort = "8000";       //Socketの初期ポート番号
+
         public MainPage()
         {
             this.InitializeComponent();
-            App.Current.Suspending += async(s, e) =>
-            {
-                var deferral = e.SuspendingOperation.GetDeferral();
-                if (socketListener != null)
-                {
-                    /*
-                    await socketListener.CancelIOAsync();
-
-                    socketListener.TransferOwnership(socketId);
-                    Debug.WriteLine("transfer");
-                    */
-                }
-
-                deferral.Complete();
-            };
+            textPort.Text = initPort;
+            textIp.Text = NetworkInformation.GetHostNames().Where(q => q.Type == HostNameType.Ipv4).First().DisplayName;
         }
-
-        protected override void OnNavigatedTo(NavigationEventArgs e)
-        {
-            base.OnNavigatedTo(e);
-            if(e.Parameter=="hoge")
-            {
-                webView.Navigate(new Uri("http://garicchi.com"));
-            }
-        }
+        
 
         private async void buttonRegister_Click(object sender, RoutedEventArgs e)
         {
             try
             {
+                //タスクがすでに登録されている場合は解除する
+                foreach(var t in BackgroundTaskRegistration.AllTasks)
+                {
+                    t.Value.Unregister(true);
+                }
+
+                //バックグラウンドタスクを登録する
+                //NameはなんでもいいけどTaskEntryPointはバックグランドタスクの {名前空間}.{クラス名} にしないとだめ
                 var socketTaskBuilder = new BackgroundTaskBuilder();
                 socketTaskBuilder.Name = "MySocketBackgroundTask";
                 socketTaskBuilder.TaskEntryPoint = "BackgroundSocketComponent.SocketListenTask";
-
+                
+                //バックグラウンドタスクでSocketを待ち受けるためのトリガー
+                //これのおかげでバックグラウンドタスクがSocketに反応できる
                 var trigger = new SocketActivityTrigger();
                 socketTaskBuilder.SetTrigger(trigger);
                 var task = socketTaskBuilder.Register();
-                socketListener = new StreamSocketListener();
+
+                //ソケットリスナー
+                var socketListener = new StreamSocketListener();
                 var hostname = NetworkInformation.GetHostNames().Where(q => q.Type == HostNameType.Ipv4).First();
-                var port = "9001";
-                Debug.WriteLine(string.Format("listen socket {0}:{1}", hostname.DisplayName, port));
-
+                var port = textPort.Text;
+                //バックグラウンドタスクとポート番号を合わせるためにローカル設定に入れておく
+                ApplicationData.Current.LocalSettings.Values["SocketPort"] = port;
+                //バックグラウンドタスクとソケットIDを合わせるためにローカル設定に入れておく
+                ApplicationData.Current.LocalSettings.Values["SocketId"] = socketId;
+                //バックグラウンドタスクにソケットリスナーの権限を渡すことを許可
+                //第2引数はDoNotWakeにしないとBind時にエラーになる
                 socketListener.EnableTransferOwnership(task.TaskId, SocketActivityConnectedStandbyAction.DoNotWake);
-
+                //ホスト名とポート番号でバインドする
                 await socketListener.BindEndpointAsync(hostname, port);
 
-
+                //ここから下はSuspendingイベントに入れてもいい
+                //ソケットリスナーをバックグランドタスクに渡すためにIOを止める
                 await socketListener.CancelIOAsync();
-
+                //バックグランドタスクに権限を渡す
                 socketListener.TransferOwnership(socketId);
 
-                var dialog = new MessageDialog("タスク登録完了しました");
+                var dialog = new MessageDialog("Complete to register backgroundtask and to start listen socket!");
                 await dialog.ShowAsync();
             }catch(Exception ex)
             {
@@ -93,6 +91,16 @@ namespace BackgroundSocketSample
                 await dialog.ShowAsync();
             }
 
+        }
+
+        private async void buttonUnRegister_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (var t in BackgroundTaskRegistration.AllTasks)
+            {
+                t.Value.Unregister(true);
+            }
+            var dialog = new MessageDialog("Complete unregister background tasks");
+            await dialog.ShowAsync();
         }
     }
 }
