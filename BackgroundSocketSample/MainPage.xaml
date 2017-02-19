@@ -1,0 +1,15 @@
+﻿<Page
+    x:Class="BackgroundSocketSample.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:BackgroundSocketSample"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Button x:Name="buttonRegister" Content="タスク登録" HorizontalAlignment="Left" Margin="284,295,0,0" VerticalAlignment="Top" Click="buttonRegister_Click"/>
+        <WebView x:Name="webView" HorizontalAlignment="Left" Height="254" Margin="112,36,0,0" VerticalAlignment="Top" Width="437"/>
+
+    </Grid>
+</Page>
